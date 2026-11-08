@@ -214,8 +214,23 @@ def run_all_checks(data_dir, split_csv, device, out_dir):
     val_tot = (sum(control_data['validation'][c][0] for c in CLASSES), sum(control_data['validation'][c][1] for c in CLASSES))
     ts_tot = (sum(control_data['test'][c][0] for c in CLASSES), sum(control_data['test'][c][1] for c in CLASSES))
 
+    with open(split_csv, 'r', encoding = 'utf-8') as f:
+        csv_rows = [line.strip().split(',') for line in f.readlines()[1:] if line.strip()]
+
+    tr_files = {r[0] for r in csv_rows if r[2] == 'train'}
+    val_files = {r[0] for r in csv_rows if r[2] == 'validation'}
+    ts_files = {r[0] for r in csv_rows if r[2] == 'test'}
+
+    intersections_empty = (len(tr_files & val_files) == 0) and (len(tr_files & ts_files) == 0) and (len(val_files & ts_files) == 0)
+    total_unique_ok = (len(tr_files | val_files | ts_files) == 4200)
+
+    if not (intersections_empty and total_unique_ok):
+        all_matched = False
+
     print(f'total      | {tr_tot[0]} / {tr_tot[1]:<9d} | {val_tot[0]} / {val_tot[1]:<9d} | {ts_tot[0]} / {ts_tot[1]:<9d}')
     print(f'split_match: {all_matched}')
+    print(f'intersections_empty: {intersections_empty}')
+    print(f'total_unique_files: {len(tr_files | val_files | ts_files)}')
     print()
 
     train_tf, _ = get_transforms()
