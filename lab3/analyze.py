@@ -206,7 +206,7 @@ def main():
     best_candidate_run = max(best_candidates, key = lambda d: d['val_macro_f1s'][-1])
     expected_best_seed = best_candidate_run['seed']
 
-    ckpt = torch.load(model_path, map_location = 'cpu', weights_only = False)
+    ckpt = torch.load(model_path, map_location = 'cpu')
     if ckpt['regime'] != expected_best_regime or ckpt['seed'] != expected_best_seed:
         raise ValueError('Model checkpoint does not match best validation run')
 
@@ -272,28 +272,46 @@ def main():
                 off_diag_pairs.append((cm[i, j], i, j))
 
     off_diag_pairs.sort(key = lambda item: (-item[0], item[1], item[2]))
-    top_pairs = off_diag_pairs[:5]
 
-    error_cases = []
-    for count, i, j in top_pairs:
+    pair_samples = []
+    for count, i, j in off_diag_pairs:
         matching_indices = [idx for idx, (t, p) in enumerate(zip(test_targets, test_preds)) if t == i and p == j]
-        matching_samples = []
-
+        matching = []
         for idx in matching_indices:
             path, _, fname = test_ds.samples[idx]
-            matching_samples.append((fname, path, probs[idx, j]))
+            matching.append((fname, path, probs[idx, j]))
+        matching.sort(key = lambda s: s[0])
+        pair_samples.append((count, i, j, matching))
 
-        matching_samples.sort(key = lambda s: s[0])
-        first_sample = matching_samples[0]
+    error_cases = []
+    for count, i, j, samples in pair_samples:
+        if len(error_cases) >= 5:
+            break
+        if len(samples) > 0:
+            error_cases.append({
+                'file': samples[0][0],
+                'path': samples[0][1],
+                'true_class': CLASSES[i],
+                'pred_class': CLASSES[j],
+                'prob': float(samples[0][2]),
+                'error_count': count
+            })
 
-        error_cases.append({
-            'file': first_sample[0],
-            'path': first_sample[1],
-            'true_class': CLASSES[i],
-            'pred_class': CLASSES[j],
-            'prob': float(first_sample[2]),
-            'error_count': count
-        })
+    file_idx = 1
+    while len(error_cases) < 5 and any(len(samples) > file_idx for _, _, _, samples in pair_samples):
+        for count, i, j, samples in pair_samples:
+            if len(error_cases) >= 5:
+                break
+            if len(samples) > file_idx:
+                error_cases.append({
+                    'file': samples[file_idx][0],
+                    'path': samples[file_idx][1],
+                    'true_class': CLASSES[i],
+                    'pred_class': CLASSES[j],
+                    'prob': float(samples[file_idx][2]),
+                    'error_count': count
+                })
+        file_idx += 1
 
     print('top error cases:')
     print('file       | true_class   | pred_class   | prob     | count ')
