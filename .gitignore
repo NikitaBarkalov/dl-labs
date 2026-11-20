@@ -240,3 +240,4 @@ __marimo__/
 **/images/
 lab2/data
 lab3/data
+*.onnx
